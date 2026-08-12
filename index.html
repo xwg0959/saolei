@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>扫雷 Minesweeper</title>
+
+<style>
+*{
+    box-sizing:border-box;
+    user-select:none;
+}
+
+body{
+    margin:0;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#1e1e1e;
+    font-family:"Microsoft YaHei";
+    color:white;
+}
+
+.container{
+    background:#2d2d2d;
+    padding:25px;
+    border-radius:15px;
+    box-shadow:0 0 30px #000;
+    text-align:center;
+}
+
+h1{
+    margin-top:0;
+}
+
+.info{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:15px;
+    font-size:20px;
+}
+
+button{
+    padding:8px 20px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#0078d4;
+    color:white;
+    font-size:16px;
+}
+
+#board{
+    display:grid;
+    gap:2px;
+    margin-top:15px;
+}
+
+.cell{
+    width:35px;
+    height:35px;
+    background:#666;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+    font-size:20px;
+    cursor:pointer;
+    border-radius:4px;
+}
+
+.cell:hover{
+    background:#888;
+}
+
+.open{
+    background:#ddd;
+    color:#111;
+    cursor:default;
+}
+
+.flag{
+    background:#ffcc00;
+}
+
+.mine{
+    background:#e74c3c;
+}
+
+.n1{color:blue}
+.n2{color:green}
+.n3{color:red}
+.n4{color:purple}
+.n5{color:brown}
+
+#message{
+    margin-top:15px;
+    font-size:22px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>💣 扫雷</h1>
+
+<div class="info">
+    <span>雷: <b id="mineCount"></b></span>
+    <span>时间: <b id="time">0</b></span>
+</div>
+
+<button onclick="restart()">重新开始</button>
+
+<div id="board"></div>
+
+<div id="message"></div>
+
+</div>
+
+
+<script>
+
+const rows=12;
+const cols=12;
+const mines=25;
+
+let board=[];
+let opened=0;
+let flags=0;
+let timer=0;
+let timerId=null;
+let started=false;
+let gameOver=false;
+
+
+const boardDiv=document.getElementById("board");
+
+
+function restart(){
+
+    board=[];
+    opened=0;
+    flags=0;
+    timer=0;
+    started=false;
+    gameOver=false;
+
+    clearInterval(timerId);
+
+    document.getElementById("time").innerText=0;
+    document.getElementById("message").innerText="";
+    document.getElementById("mineCount").innerText=mines;
+
+    createBoard();
+}
+
+
+
+function createBoard(){
+
+    boardDiv.innerHTML="";
+    boardDiv.style.gridTemplateColumns=
+        `repeat(${cols},35px)`;
+
+
+    for(let r=0;r<rows;r++){
+
+        board[r]=[];
+
+        for(let c=0;c<cols;c++){
+
+            board[r][c]={
+                mine:false,
+                num:0,
+                open:false,
+                flag:false
+            };
+
+        }
+    }
+
+
+    //随机放雷
+    let count=0;
+
+    while(count<mines){
+
+        let r=Math.floor(Math.random()*rows);
+        let c=Math.floor(Math.random()*cols);
+
+        if(!board[r][c].mine){
+
+            board[r][c].mine=true;
+            count++;
+
+        }
+    }
+
+
+    //计算数字
+    for(let r=0;r<rows;r++){
+
+        for(let c=0;c<cols;c++){
+
+            if(!board[r][c].mine){
+
+                board[r][c].num=countMines(r,c);
+
+            }
+
+        }
+    }
+
+
+    //生成UI
+    for(let r=0;r<rows;r++){
+
+        for(let c=0;c<cols;c++){
+
+            let div=document.createElement("div");
+
+            div.className="cell";
+
+            div.dataset.r=r;
+            div.dataset.c=c;
+
+
+            div.onclick=()=>openCell(r,c);
+
+            div.oncontextmenu=e=>{
+                e.preventDefault();
+                flagCell(r,c);
+            };
+
+
+            boardDiv.appendChild(div);
+
+        }
+    }
+
+}
+
+
+
+function countMines(r,c){
+
+    let n=0;
+
+    for(let y=-1;y<=1;y++){
+        for(let x=-1;x<=1;x++){
+
+            let nr=r+y;
+            let nc=c+x;
+
+            if(
+                nr>=0&&
+                nr<rows&&
+                nc>=0&&
+                nc<cols&&
+                board[nr][nc].mine
+            )
+            n++;
+
+        }
+    }
+
+    return n;
+
+}
+
+
+
+function openCell(r,c){
+
+    if(gameOver)return;
+
+    if(!started){
+
+        started=true;
+
+        timerId=setInterval(()=>{
+
+            timer++;
+            document.getElementById("time").innerText=timer;
+
+        },1000);
+
+    }
+
+
+    let cell=board[r][c];
+
+
+    if(cell.flag||cell.open)
+        return;
+
+
+    if(cell.mine){
+
+        cell.open=true;
+
+        draw();
+
+        gameOver=true;
+
+        clearInterval(timerId);
+
+        document.getElementById("message").innerText=
+        "💥 游戏失败";
+
+        showMines();
+
+        return;
+    }
+
+
+    flood(r,c);
+
+    draw();
+
+    checkWin();
+
+}
+
+
+
+function flood(r,c){
+
+    if(
+        r<0||
+        c<0||
+        r>=rows||
+        c>=cols
+    )
+    return;
+
+
+    let cell=board[r][c];
+
+
+    if(cell.open||cell.flag)
+        return;
+
+
+    cell.open=true;
+
+    opened++;
+
+
+    if(cell.num===0){
+
+        for(let y=-1;y<=1;y++){
+
+            for(let x=-1;x<=1;x++){
+
+                flood(r+y,c+x);
+
+            }
+
+        }
+
+    }
+
+}
+
+
+
+function flagCell(r,c){
+
+    if(gameOver)return;
+
+
+    let cell=board[r][c];
+
+
+    if(cell.open)
+        return;
+
+
+    cell.flag=!cell.flag;
+
+
+    flags += cell.flag?1:-1;
+
+
+    document.getElementById("mineCount").innerText=
+        mines-flags;
+
+
+    draw();
+
+}
+
+
+
+function draw(){
+
+    let cells=document.querySelectorAll(".cell");
+
+
+    cells.forEach(div=>{
+
+        let r=div.dataset.r;
+        let c=div.dataset.c;
+
+        let cell=board[r][c];
+
+
+        div.className="cell";
+
+
+        if(cell.open){
+
+            div.classList.add("open");
+
+
+            if(cell.mine){
+
+                div.innerHTML="💣";
+                div.classList.add("mine");
+
+            }
+            else if(cell.num){
+
+                div.innerHTML=cell.num;
+                div.classList.add("n"+cell.num);
+
+            }
+            else{
+
+                div.innerHTML="";
+
+            }
+
+        }
+        else if(cell.flag){
+
+            div.innerHTML="🚩";
+            div.classList.add("flag");
+
+        }
+        else{
+
+            div.innerHTML="";
+
+        }
+
+    });
+
+}
+
+
+
+function showMines(){
+
+    for(let r=0;r<rows;r++){
+
+        for(let c=0;c<cols;c++){
+
+            if(board[r][c].mine){
+
+                board[r][c].open=true;
+
+            }
+
+        }
+
+    }
+
+    draw();
+
+}
+
+
+
+function checkWin(){
+
+    if(opened===rows*cols-mines){
+
+        gameOver=true;
+
+        clearInterval(timerId);
+
+        document.getElementById("message").innerText=
+        "🎉 胜利!";
+
+    }
+
+}
+
+
+restart();
+
+</script>
+
+</body>
+</html>
