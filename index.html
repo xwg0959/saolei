@@ -2,793 +2,218 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>扫雷 Minesweeper</title>
-
+<title>Win11 Fluent Minesweeper</title>
 <style>
-*{
-    box-sizing:border-box;
-    user-select:none;
-}
-
+*{box-sizing:border-box;user-select:none}
 body{
-    margin:0;
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background:#202020;
-    font-family:"Microsoft YaHei";
-    color:white;
+    margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
+    font-family:"Microsoft YaHei",sans-serif;
+    background:linear-gradient(135deg,#dbeafe,#f5f5f5);
 }
-
-.container{
-    background:#303030;
-    padding:25px;
-    border-radius:15px;
-    box-shadow:0 0 30px #000;
-    text-align:center;
+.window{
+    width:min(95vw,900px);
+    padding:24px;
+    border-radius:24px;
+    background:rgba(255,255,255,.65);
+    backdrop-filter:blur(20px);
+    box-shadow:0 20px 50px #0003;
 }
-
-h1{
-    margin-top:0;
-}
-
-.info{
-    display:flex;
-    justify-content:space-between;
+h1{text-align:center}
+.panel{
+    display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
     margin-bottom:15px;
-    font-size:20px;
 }
-
+input,button{
+    border:0;border-radius:12px;padding:10px 14px;
+}
 button{
-    padding:8px 20px;
-    border:none;
-    border-radius:8px;
-    background:#0078d4;
-    color:white;
-    cursor:pointer;
-    font-size:16px;
+    background:#0078d4;color:white;cursor:pointer;
 }
-
 #board{
-    display:grid;
-    gap:2px;
-    margin-top:15px;
+    display:grid;gap:3px;justify-content:center;
 }
-
 .cell{
-
-    width:35px;
-    height:35px;
-
-    display:flex;
-    justify-content:center;
-    align-items:center;
-
-    background:#666;
-
-    border-radius:4px;
-
-    font-size:20px;
-    font-weight:bold;
-
+    width:34px;height:34px;
+    border-radius:8px;
+    background:#b8c7d9;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:bold;font-size:18px;
     cursor:pointer;
 }
-
-
-.cell:hover{
-    background:#888;
-}
-
-
-.open{
-
-    background:#ddd;
-    cursor:default;
-
-}
-
-
-.flag{
-
-    background:#ffc107;
-
-}
-
-
-.mine{
-
-    background:#e74c3c;
-
-}
-
-
-.n1{color:#0066ff}
-.n2{color:#008000}
-.n3{color:#ff0000}
-.n4{color:#800080}
-.n5{color:#800000}
-
-
-#message{
-
-    margin-top:15px;
-    font-size:22px;
-
-}
-
+.cell:hover{background:#9db4cf}
+.open{background:#eee;cursor:default}
+.flag{background:#ffd54f}
+.mine{background:#ef5350}
+.n1{color:#1565c0}.n2{color:#2e7d32}.n3{color:#c62828}
+#info{text-align:center;font-size:18px;margin:10px}
+#msg{text-align:center;font-size:22px;margin-top:10px}
 </style>
-
 </head>
-
-
 <body>
+<div class="window">
+<h1>💣 Win11 扫雷</h1>
 
-
-<div class="container">
-
-<h1>💣 扫雷</h1>
-
-
-<div class="info">
-
-<span>
-雷:
-<b id="mineCount"></b>
-</span>
-
-
-<span>
-时间:
-<b id="time">0</b>
-</span>
-
+<div class="panel">
+行 <input id="r" value="12" type="number">
+列 <input id="c" value="12" type="number">
+雷 <input id="m" value="25" type="number">
+<button onclick="apply()">应用</button>
+<button onclick="restart()">重新开始</button>
 </div>
 
-
-<button onclick="restart()">
-重新开始
-</button>
-
-
+<div id="info">雷: <span id="mc"></span>　时间: <span id="time">0</span></div>
 <div id="board"></div>
-
-
-<div id="message"></div>
-
-
+<div id="msg"></div>
 </div>
-
-
 
 <script>
+let rows=12,cols=12,mines=25;
+let board=[],opened=0,flags=0,time=0;
+let timer=null,started=false,over=false,generated=false;
 
-
-const rows=12;
-const cols=12;
-const mines=25;
-
-
-let board=[];
-
-let opened=0;
-let flags=0;
-
-let timer=0;
-let timerId=null;
-
-let started=false;
-let gameOver=false;
-
-let generated=false;
-
-
-
-const boardDiv=document.getElementById("board");
-
-
-
-
+function apply(){
+ rows=+r.value; cols=+c.value; mines=+m.value;
+ if(mines>=rows*cols-9){alert("雷太多");return}
+ restart();
+}
 
 function restart(){
-
-
-    board=[];
-
-    opened=0;
-    flags=0;
-
-    timer=0;
-
-    started=false;
-    gameOver=false;
-
-    generated=false;
-
-
-    clearInterval(timerId);
-
-
-    document.getElementById("time").innerText=0;
-
-    document.getElementById("mineCount").innerText=mines;
-
-    document.getElementById("message").innerText="";
-
-
-    createBoard();
-
+ clearInterval(timer);
+ board=[];opened=0;flags=0;time=0;
+ started=false;over=false;generated=false;
+ timeEl().innerText=0;
+ mc.innerText=mines;
+ msg.innerText="";
+ create();
 }
 
-
-
-
-function createBoard(){
-
-
-    boardDiv.innerHTML="";
-
-
-    boardDiv.style.gridTemplateColumns=
-        `repeat(${cols},35px)`;
-
-
-
-    for(let r=0;r<rows;r++){
-
-        board[r]=[];
-
-        for(let c=0;c<cols;c++){
-
-
-            board[r][c]={
-
-                mine:false,
-
-                num:0,
-
-                open:false,
-
-                flag:false
-
-            };
-
-
-        }
-
-    }
-
-
-
-    for(let r=0;r<rows;r++){
-
-        for(let c=0;c<cols;c++){
-
-
-            let div=document.createElement("div");
-
-
-            div.className="cell";
-
-
-            div.dataset.r=r;
-            div.dataset.c=c;
-
-
-
-            div.onclick=function(){
-
-                openCell(r,c);
-
-            };
-
-
-            div.oncontextmenu=function(e){
-
-                e.preventDefault();
-
-                flagCell(r,c);
-
-            };
-
-
-            boardDiv.appendChild(div);
-
-
-        }
-
-    }
-
-
+function create(){
+ boardDiv.innerHTML="";
+ boardDiv.style.gridTemplateColumns=`repeat(${cols},34px)`;
+ for(let y=0;y<rows;y++){
+  board[y]=[];
+  for(let x=0;x<cols;x++)
+   board[y][x]={mine:false,num:0,open:false,flag:false};
+ }
+ for(let y=0;y<rows;y++)
+  for(let x=0;x<cols;x++){
+   let d=document.createElement("div");
+   d.className="cell";
+   d.onclick=()=>open(y,x);
+   d.oncontextmenu=e=>{e.preventDefault();flag(y,x)};
+   boardDiv.appendChild(d);
+  }
 }
 
+function generate(sy,sx){
+ let a=[];
+ for(let y=0;y<rows;y++)
+  for(let x=0;x<cols;x++)
+   if(Math.abs(y-sy)>1||Math.abs(x-sx)>1)a.push([y,x]);
 
+ a.sort(()=>Math.random()-.5);
+ for(let i=0;i<mines;i++)board[a[i][0]][a[i][1]].mine=true;
 
+ for(let y=0;y<rows;y++)
+  for(let x=0;x<cols;x++)
+   board[y][x].num=count(y,x);
 
-
-// 第一次点击生成雷
-
-function generateMines(sr,sc){
-
-
-    let list=[];
-
-
-
-    for(let r=0;r<rows;r++){
-
-        for(let c=0;c<cols;c++){
-
-
-
-            if(
-                Math.abs(r-sr)<=1 &&
-                Math.abs(c-sc)<=1
-            ){
-
-                continue;
-
-            }
-
-
-            list.push([r,c]);
-
-        }
-
-    }
-
-
-
-    list.sort(()=>Math.random()-0.5);
-
-
-
-    for(let i=0;i<mines;i++){
-
-
-        let [r,c]=list[i];
-
-
-        board[r][c].mine=true;
-
-
-    }
-
-
-
-    for(let r=0;r<rows;r++){
-
-        for(let c=0;c<cols;c++){
-
-
-
-            if(!board[r][c].mine){
-
-
-                board[r][c].num=countMines(r,c);
-
-
-            }
-
-
-        }
-
-    }
-
-
-    generated=true;
-
-
+ generated=true;
 }
 
-
-
-
-
-
-function countMines(r,c){
-
-
-    let n=0;
-
-
-    for(let y=-1;y<=1;y++){
-
-        for(let x=-1;x<=1;x++){
-
-
-            let nr=r+y;
-            let nc=c+x;
-
-
-
-            if(
-
-                nr>=0 &&
-                nr<rows &&
-                nc>=0 &&
-                nc<cols &&
-                board[nr][nc].mine
-
-            ){
-
-                n++;
-
-            }
-
-
-        }
-
-    }
-
-
-    return n;
-
-
+function count(y,x){
+ let n=0;
+ for(let a=-1;a<=1;a++)
+  for(let b=-1;b<=1;b++){
+   let Y=y+a,X=x+b;
+   if(board[Y]?.[X]?.mine)n++;
+  }
+ return n;
 }
 
+function open(y,x){
+ if(over)return;
+ if(!generated)generate(y,x);
 
+ if(!started){
+  started=true;
+  timer=setInterval(()=>{
+   time++;timeEl().innerText=time;
+  },1000);
+ }
 
+ let c=board[y][x];
+ if(c.flag||c.open)return;
 
+ if(c.mine){
+  c.open=true;
+  showMines();
+  over=true;
+  clearInterval(timer);
+  msg.innerText="💥 游戏失败";
+  return;
+ }
 
-
-
-function openCell(r,c){
-
-
-    if(gameOver)
-        return;
-
-
-
-    if(!generated){
-
-        generateMines(r,c);
-
-    }
-
-
-
-    if(!started){
-
-
-        started=true;
-
-
-        timerId=setInterval(()=>{
-
-
-            timer++;
-
-
-            document.getElementById("time").innerText=timer;
-
-
-        },1000);
-
-
-    }
-
-
-
-    let cell=board[r][c];
-
-
-
-    if(cell.flag||cell.open)
-        return;
-
-
-
-
-
-    if(cell.mine){
-
-
-        cell.open=true;
-
-
-        showMines();
-
-
-        gameOver=true;
-
-
-        clearInterval(timerId);
-
-
-        document.getElementById("message").innerText=
-            "💥 游戏失败";
-
-
-        return;
-
-
-    }
-
-
-
-
-    flood(r,c);
-
-
-    draw();
-
-
-    checkWin();
-
-
+ flood(y,x);
+ draw();
+ win();
 }
 
-
-
-
-
-
-
-// 连锁展开
-
-function flood(r,c){
-
-
-    if(
-
-        r<0 ||
-        c<0 ||
-        r>=rows ||
-        c>=cols
-
-    )
-        return;
-
-
-
-    let cell=board[r][c];
-
-
-
-    if(cell.open||cell.flag)
-        return;
-
-
-
-    cell.open=true;
-
-
-    opened++;
-
-
-
-
-
-    if(cell.num===0){
-
-
-        for(let y=-1;y<=1;y++){
-
-
-            for(let x=-1;x<=1;x++){
-
-
-                flood(
-                    r+y,
-                    c+x
-                );
-
-
-            }
-
-
-        }
-
-
-    }
-
-
+function flood(y,x){
+ if(y<0||x<0||y>=rows||x>=cols)return;
+ let c=board[y][x];
+ if(c.open||c.flag)return;
+ c.open=true;opened++;
+ if(c.num==0)
+  for(let a=-1;a<=1;a++)
+   for(let b=-1;b<=1;b++)
+    flood(y+a,x+b);
 }
 
-
-
-
-
-
-
-
-function flagCell(r,c){
-
-
-    if(gameOver)
-        return;
-
-
-    let cell=board[r][c];
-
-
-    if(cell.open)
-        return;
-
-
-
-    cell.flag=!cell.flag;
-
-
-    flags += cell.flag?1:-1;
-
-
-
-    document.getElementById("mineCount").innerText=
-        mines-flags;
-
-
-
-    draw();
-
-
+function flag(y,x){
+ if(over)return;
+ let c=board[y][x];
+ if(c.open)return;
+ c.flag=!c.flag;
+ flags+=c.flag?1:-1;
+ mc.innerText=mines-flags;
+ draw();
 }
-
-
-
-
-
-
-
-
 
 function draw(){
-
-
-    let cells=document.querySelectorAll(".cell");
-
-
-
-    cells.forEach(div=>{
-
-
-        let r=div.dataset.r;
-
-        let c=div.dataset.c;
-
-
-
-        let cell=board[r][c];
-
-
-
-        div.className="cell";
-
-
-
-        if(cell.open){
-
-
-            div.classList.add("open");
-
-
-
-            if(cell.mine){
-
-
-                div.innerHTML="💣";
-
-                div.classList.add("mine");
-
-
-            }
-            else if(cell.num){
-
-
-                div.innerHTML=cell.num;
-
-                div.classList.add("n"+cell.num);
-
-
-            }
-            else{
-
-
-                div.innerHTML="";
-
-
-            }
-
-
-        }
-        else if(cell.flag){
-
-
-            div.innerHTML="🚩";
-
-            div.classList.add("flag");
-
-
-        }
-        else{
-
-
-            div.innerHTML="";
-
-
-        }
-
-
-
-    });
-
-
+ [...boardDiv.children].forEach((d,i)=>{
+  let y=Math.floor(i/cols),x=i%cols,c=board[y][x];
+  d.className="cell";d.innerHTML="";
+  if(c.open){
+   d.classList.add("open");
+   if(c.mine){d.innerHTML="💣";d.classList.add("mine")}
+   else if(c.num){d.innerHTML=c.num;d.classList.add("n"+c.num)}
+  }else if(c.flag){
+   d.innerHTML="🚩";d.classList.add("flag");
+  }
+ });
 }
-
-
-
-
-
-
 
 function showMines(){
-
-
-    for(let r=0;r<rows;r++){
-
-
-        for(let c=0;c<cols;c++){
-
-
-            if(board[r][c].mine){
-
-
-                board[r][c].open=true;
-
-
-            }
-
-
-        }
-
-
-    }
-
-
-    draw();
-
-
+ for(let y of board)
+  for(let c of y)
+   if(c.mine)c.open=true;
+ draw();
 }
 
-
-
-
-
-
-
-function checkWin(){
-
-
-    if(opened===rows*cols-mines){
-
-
-        gameOver=true;
-
-
-        clearInterval(timerId);
-
-
-
-        document.getElementById("message").innerText=
-            "🎉 胜利!";
-
-
-    }
-
-
+function win(){
+ if(opened==rows*cols-mines){
+  over=true;
+  clearInterval(timer);
+  msg.innerText="🎉 胜利";
+ }
 }
 
-
-
-
-
+function timeEl(){return document.getElementById("time")}
+let boardDiv=document.getElementById("board");
+let mc=document.getElementById("mc");
+let msg=document.getElementById("msg");
 restart();
-
-
 </script>
-
-
 </body>
 </html>
